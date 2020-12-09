@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -18,7 +18,7 @@ import busters
 import game
 
 from util import manhattanDistance, raiseNotDefined
-
+import util
 
 class DiscreteDistribution(dict):
     """
@@ -75,7 +75,7 @@ class DiscreteDistribution(dict):
         {}
         """
         t = self.total()
-        if t: 
+        if t:
             for item in self.items():
                 self[item[0]] = item[1] / t
 
@@ -257,7 +257,7 @@ class InferenceModule:
         Return the agent's current belief state, a distribution over ghost
         locations conditioned on all evidence so far.
         """
-        raise NotImplementedError
+
 
 
 class ExactInference(InferenceModule):
@@ -344,8 +344,19 @@ class ParticleFilter(InferenceModule):
         distributed across positions in order to ensure a uniform prior. Use
         self.particles for the list of particles.
         """
+        print("uniform initialization")
         self.particles = []
+
+
         "*** YOUR CODE HERE ***"
+        num_particles = self.numParticles
+        positions = self.legalPositions
+        i = 0
+        while i < num_particles:
+            for p in positions:
+                self.particles.append(p)
+                i += 1
+
 
     def update(self, observation, gameState):
         """
@@ -353,8 +364,38 @@ class ParticleFilter(InferenceModule):
 
         The observation is the estimated Manhattan distance to the ghost you are
         tracking.
+
+        >>> dist['a'] = 1
+        >>> dist['b'] = 2
+        >>> dist['c'] = 2
+        >>> dist['d'] = 0
+        >>> N = 100000.0
+        >>> samples = [dist.sample() for _ in range(int(N))]
+
+
         """
         "*** YOUR CODE HERE ***"
+
+        allPositions = self.legalPositions
+        pacmanPosition = gameState.getPacmanPosition()
+        jailPosition = self.getJailPosition()
+        pacmanPosition = gameState.getPacmanPosition()
+
+        beliefDist = self.getBeliefDistribution()    # particle distribution
+        weighted_dist = DiscreteDistribution()
+
+        for ghostPosition in allPositions:
+            obsProb = self.getObservationProb(observation, pacmanPosition,
+                            ghostPosition, jailPosition)
+            weighted_dist[ghostPosition] = obsProb * beliefDist[ghostPosition]
+
+        if weighted_dist.total() == 0:
+            self.initializeUniformly(gameState)
+        else:
+            num_particles = self.numParticles
+            self.particles = [weighted_dist.sample() for _ in range(int(num_particles))]
+
+
 
     def predict(self, gameState):
         """
@@ -363,6 +404,22 @@ class ParticleFilter(InferenceModule):
         """
         "*** YOUR CODE HERE ***"
 
+        allPositions = self.allPositions
+
+
+        beliefDist = self.getBeliefDistribution()  # normalized distribution returned
+        nextTsDist = DiscreteDistribution()
+
+        # finds P(X1 = 1)-ish calcs
+        for oldPos in allPositions:
+            newPosDist = self.getPositionDistribution(gameState, oldPos)
+            for item in newPosDist.items():
+                nextTsDist[item[0]] += beliefDist[oldPos] * item[1]
+
+        self.particles = [nextTsDist.sample() for _ in range(int(self.numParticles))]
+
+
+
     def getBeliefDistribution(self):
         """
         Return the agent's current belief state, a distribution over ghost
@@ -370,7 +427,16 @@ class ParticleFilter(InferenceModule):
         essentially converts a list of particles into a belief distribution.
         """
         "*** YOUR CODE HERE ***"
+        distribution = util.Counter()
 
+        for p in self.particles:
+            distribution[p] += 1
+
+        # print(distribution)
+        discreteDist = DiscreteDistribution(distribution)
+        discreteDist.normalize()
+
+        return discreteDist
 
 class JointParticleFilter(ParticleFilter):
     """
