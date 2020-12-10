@@ -347,8 +347,6 @@ class ParticleFilter(InferenceModule):
         print("uniform initialization")
         self.particles = []
 
-
-        "*** YOUR CODE HERE ***"
         num_particles = self.numParticles
         positions = self.legalPositions
         i = 0
@@ -374,12 +372,9 @@ class ParticleFilter(InferenceModule):
 
 
         """
-        "*** YOUR CODE HERE ***"
-
         allPositions = self.legalPositions
         pacmanPosition = gameState.getPacmanPosition()
         jailPosition = self.getJailPosition()
-        pacmanPosition = gameState.getPacmanPosition()
 
         beliefDist = self.getBeliefDistribution()    # particle distribution
         weighted_dist = DiscreteDistribution()
@@ -402,7 +397,6 @@ class ParticleFilter(InferenceModule):
         Sample each particle's next state based on its current state and the
         gameState.
         """
-        "*** YOUR CODE HERE ***"
 
         allPositions = self.allPositions
 
@@ -410,7 +404,7 @@ class ParticleFilter(InferenceModule):
         beliefDist = self.getBeliefDistribution()  # normalized distribution returned
         nextTsDist = DiscreteDistribution()
 
-        # finds P(X1 = 1)-ish calcs
+        # finds P(X1 = 1)-ish calcs // prev ghost pos is oldPos
         for oldPos in allPositions:
             newPosDist = self.getPositionDistribution(gameState, oldPos)
             for item in newPosDist.items():
@@ -426,7 +420,6 @@ class ParticleFilter(InferenceModule):
         locations conditioned on all evidence and time passage. This method
         essentially converts a list of particles into a belief distribution.
         """
-        "*** YOUR CODE HERE ***"
         distribution = util.Counter()
 
         for p in self.particles:
@@ -462,7 +455,16 @@ class JointParticleFilter(ParticleFilter):
         uniform prior.
         """
         self.particles = []
-        "*** YOUR CODE HERE ***"
+        num_particles = self.numParticles
+        positions = self.legalPositions
+
+        tup = list(itertools.product(positions, positions))
+        random.shuffle(tup)
+        i = 0
+        while i < num_particles:
+            for p in tup:
+                self.particles.append(p)
+                i += 1
 
     def addGhostAgent(self, agent):
         """
@@ -489,7 +491,27 @@ class JointParticleFilter(ParticleFilter):
         The observation is the estimated Manhattan distances to all ghosts you
         are tracking.
         """
-        "*** YOUR CODE HERE ***"
+        allPositions = self.legalPositions
+        pacmanPosition = gameState.getPacmanPosition()
+
+        beliefDist = self.getBeliefDistribution()    # particle distribution
+        weighted_dist = DiscreteDistribution()
+
+
+        for particle in self.particles:
+            aggWeight = 1
+            for ghost in range(self.numGhosts):
+                jailPosition = self.getJailPosition(ghost)
+                aggWeight *= self.getObservationProb(observation[ghost], pacmanPosition,
+                            particle[ghost], jailPosition)
+            weighted_dist[particle] = aggWeight * beliefDist[particle]
+
+        if weighted_dist.total() == 0:
+            self.initializeUniformly(gameState)
+        else:
+            num_particles = self.numParticles
+            self.particles = [weighted_dist.sample() for _ in range(int(num_particles))]
+
 
     def predict(self, gameState):
         """
@@ -501,7 +523,11 @@ class JointParticleFilter(ParticleFilter):
             newParticle = list(oldParticle)  # A list of ghost positions
 
             # now loop through and update each entry in newParticle...
-            "*** YOUR CODE HERE ***"
+            for ghost in range(self.numGhosts):
+                newPosDist = self.getPositionDistribution(gameState, oldParticle, 
+                            ghost, self.ghostAgents[ghost])
+                newParticle[ghost] = newPosDist.sample()
+
 
             """*** END YOUR CODE HERE ***"""
             newParticles.append(tuple(newParticle))
